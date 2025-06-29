@@ -1,4 +1,4 @@
-name: Sync Fork
+name: Sync Fork and Rename File
 
 on:
   schedule:
@@ -6,16 +6,39 @@ on:
   workflow_dispatch: # 允许手动触发工作流
 
 jobs:
-  sync:
+  sync_and_rename:
     runs-on: ubuntu-latest
     steps:
       - name: Sync Fork
-        uses: tgymnich/fork-sync@v2.0 # 使用最新的版本
+        uses: tgymnich/fork-sync@v2.0 # 使用最新版本
         with:
-          owner: eraycc # 例如：octocat
+          owner:  eraycc # 例如：octocat
           repo: m3u8-proxy-script # 例如：Spoon-Knife
-          token: ${{ secrets.GITHUB_TOKEN }} # 使用GitHub内置的TOKEN
-          base: main # 你的fork中的目标分支，通常是main或master
-          head: main # 上游仓库中的源分支，通常是main或master
-          merge_method: merge # 合并方式：merge, rebase, squash
-          auto_approve: true # 是否自动批准拉取请求（如果需要，需要配置一个具有足够权限的PAT）
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main # 你的fork中的目标分支
+          head: main # 上游仓库中的源分支
+          merge_method: merge # 合并方式
+          auto_approve: true
+
+      - name: Checkout repository for file operations
+        # 在同步后，需要重新checkout仓库，因为tgymnich/fork-sync通常不会将更改留在工作区
+        uses: actions/checkout@v4
+        with:
+          ref: main # 确保checkout到正确的分支
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename file after sync
+        run: |
+          # 检查文件是否存在，避免因文件不存在而导致失败
+          if [ -f "worker-cache.js" ]; then
+            git mv "worker-cache.js" "_worker.js"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Auto: Rename file after fork sync"
+            git push
+          else
+            echo "File 'worker-cache.js' not found, skipping rename."
+          fi
+        env:
+          # 确保这里也有足够的权限进行推送
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
